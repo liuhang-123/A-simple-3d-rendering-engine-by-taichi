@@ -16,14 +16,14 @@ focal_lenth=200
 
 ti.init(arch=ti.gpu)
 
-Number_of_triangles=1000
-MAX_Number_of_triangles=1000
+Number_of_triangles=6000
+MAX_Number_of_triangles=6000
 dots=ti.field(dtype=ti.f32, shape=(MAX_Number_of_triangles,3,3))
 points=ti.field(dtype=ti.f32, shape=(MAX_Number_of_triangles,3,3))
 #filtered_points=ti.field(dtype=ti.f32, shape=(MAX_Number_of_triangles,3))
 screen_points=ti.field(dtype=ti.i32, shape=(MAX_Number_of_triangles,3,2))
 #faces=ti.field(dtype=ti.f32, shape=(MAX_Number_of_dot//2,3))
-visible_count = ti.field(dtype=ti.i32, shape=())
+
 screen_buffer=ti.field(dtype=ti.f32, shape=(SCREENWIDTH, SCREENHIEGHT, 3))
 
 
@@ -62,7 +62,7 @@ def rotate(x,y,theta):
 def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
                  x_rotate: ti.f32, y_rotate: ti.f32, z_rotate: ti.f32,focal_lenth:ti.f32):
     clear()
-    visible_count[None] = 0
+
     count = 0
 
 
@@ -91,24 +91,27 @@ def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
         if (points[i,0, 2] <= 0.1 and ti.abs(focal_lenth * points[i,0, 0]  / points[i,0, 2]) < SCREENWIDTH / 2 and ti.abs(focal_lenth * points[i,0, 1] / points[i,0, 2]) < SCREENHIEGHT / 2) or (points[i,1, 2] <= 0.1 and ti.abs(focal_lenth * points[i,1, 0]  / points[i,1, 2]) < SCREENWIDTH / 2 and ti.abs(focal_lenth * points[i,1, 1] / points[i,1, 2]) < SCREENHIEGHT / 2) or (points[i,2, 2] <= 0.1 and ti.abs(focal_lenth * points[i,2, 0]  / points[i,2, 2]) < SCREENWIDTH / 2 and ti.abs(focal_lenth * points[i,2, 1] / points[i,2, 2]) < SCREENHIEGHT / 2):
 
             # 存储屏幕坐标
-            idx = ti.atomic_add(count, 1)
+
             for j in range(3):
-                screen_points[idx,j, 0] =ti.cast( focal_lenth * points[i,j, 0]  / points[i,j, 2] + SCREENWIDTH / 2,ti.i32)
-                screen_points[idx,j, 1] = ti.cast(focal_lenth * points[i,j, 1] / points[i,j, 2] + SCREENHIEGHT / 2,ti.i32)
-    visible_count[None] = count
+                screen_points[i,j, 0] =ti.cast( focal_lenth * points[i,j, 0]  / points[i,j, 2] + SCREENWIDTH / 2,ti.i32)
+                screen_points[i,j, 1] = ti.cast(focal_lenth * points[i,j, 1] / points[i,j, 2] + SCREENHIEGHT / 2,ti.i32)
+        else:
+            for j in range(3):
+                screen_points[i,j, 0]=ti.cast(10000,ti.i32)
+                screen_points[i,j, 0]=ti.cast(10000,ti.i32)
 
 
 
     #for i, j in ti.ndrange(SCREENWIDTH,SCREENHIEGHT):
-    for p in range(visible_count[None]):
-        for o in range(3):
+    for p,o in ti.ndrange(Number_of_triangles,3):
 
-            i=screen_points[p,o,0]
-            j=screen_points[p,o,1]
-            screen_buffer[i,j,0]=255
-            screen_buffer[i,j,1]=255
 
-            #screen_buffer[i,j,0]==255
+        i=screen_points[p,o,0]
+        j=screen_points[p,o,1]
+        screen_buffer[i,j,0]=255
+        screen_buffer[i,j,1]=255
+
+        #screen_buffer[i,j,0]==255
 
 # 创建GUI窗口，标题为 "My Renderer"，分辨率与缓冲区一致
 gui = ti.GUI("My Renderer", res=(SCREENWIDTH,SCREENHIEGHT))
@@ -135,4 +138,5 @@ while gui.running:
 
     gui.set_image(screen_buffer)  # 将数据显示到窗口
     gui.show()
+
 
