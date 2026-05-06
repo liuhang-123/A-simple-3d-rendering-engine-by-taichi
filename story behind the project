@@ -1,0 +1,66 @@
+How I Built a 3D Engine Before College
+
+It started with a polar coordinate.
+
+In precalculus class, my teacher introduced polar coordinates. I noticed something: when you walk forward, points in 3D space rush outward from the vanishing point at the center of your vision. That's just the radius changing while the angle stays fixed. And when you turn your head? The angle changes, but the radius doesn't.
+
+That single observation became an obsession.
+
+Phase 1: The Naive Version
+I broke 3D rotation down into three separate 2D plane rotations. My first renderer constantly converted back and forth between Cartesian and polar coordinates — rotation needed polar, perspective needed Cartesian. It worked. It was also painfully slow. The conversion overhead crushed performance.
+
+I grabbed classmates and we figured out the 2D rotation formulas together on scratch paper. Then DeepSeek pointed out something that rewired my brain: dividing x/z and y/z is mathematically equivalent to changing the polar radius. That insight let me rip polar coordinates out of my codebase entirely. The math got simpler. The speed improved. I had just learned that a good abstraction can become a cage, and removing it can set everything free.
+
+Phase 2: Meeting the GPU
+I kept pushing. More points. Faster frames. Pure Python on CPU hit a wall. DeepSeek mentioned something called Taichi — a framework that lets you write Python-like code that runs massively parallel on the GPU.
+
+I almost quit.
+
+Taichi's ti.field, ti.kernel, ti.func felt like a different language. Data has to live on the GPU. You can't just pass things around like normal Python. The CPU and GPU are separated by a real bottleneck, and shoving data across that bridge every frame murders performance. I learned about parallel vs. serial execution, GPU-CPU data transfer costs, and precomputation the hard way — by writing broken code until it stopped being broken.
+
+Eventually, I had a renderer pushing 10 million points at over 150 FPS with smooth camera rotation and translation. Perspective projection, rotation, translation — every transformation written by hand with trigonometry, computed in parallel on the GPU. No OpenGL. No game engine. Just math and a Taichi kernel.
+
+Phase 3: What Comes Next
+I'm not done.
+
+I'm building a triangle rasterizer on top of this engine. Flat, solid-color triangles. No lighting. No shadows. Deliberately simple.
+
+Because here's the real project: a multiplayer FPS where camouflage is the core mechanic.
+
+Players are spheres, colored identically to the triangle environments.
+
+From the front, you see nothing. Your enemy blends perfectly into the geometry.
+
+You have to move, flank, and view from an angle to detect the silhouette.
+
+Firing a weapon creates a ripple — a visible wave that briefly exposes the shooter's position.
+
+I've already built the networking layer: TCP sockets, heartbeat detection, identity verification — all communicating within a local network. The server and client architecture is in place.
+
+Everything is written from scratch. No Unity. No Unreal. Just Python, Taichi, and sockets.
+
+The Real Teachers
+I had no formal CS teacher for any of this.
+
+My classroom was the internet. Documentation pages. Forum threads. And DeepSeek — which I used not as a code generator, but as a 24-hour research partner. I would ask it why something worked, not just how. It would point me toward concepts I didn't know existed, and I would dig deeper myself.
+
+I learned Python alone. I learned parallel computing alone. I learned 3D graphics pipelines alone. The solitude taught me something valuable: when you have no teacher, you learn how to learn.
+
+What This Repo Contains
+  A fully hand-written 3D point cloud renderer using Taichi
+
+  Trigonometric rotation and perspective projection — no matrix libraries, no graphics APIs
+
+  Real-time interactive camera with keyboard controls
+
+  High-performance GPU parallel computation (10M+ points, 150+ FPS)
+
+Coming soon:
+
+  Triangle rasterization engine
+
+  Flat-color 3D FPS game with unique camouflage mechanics
+
+  Multiplayer support over TCP
+
+"I didn't need a classroom. I needed a problem I couldn't stop thinking about."
