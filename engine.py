@@ -11,7 +11,7 @@ camera_z=0.0
 x_rotate=80.0
 y_rotate=10.0
 z_rotate=10.0
-focal_lenth=200
+focal_lenth=500
 
 ti.init(arch=ti.gpu)
 
@@ -48,11 +48,12 @@ def rotate(x,y,theta):
 
 @ti.func
 def clear():
-    for i, j in ti.ndrange(SCREENWIDTH,SCREENHEIGHT):
-        screen_buffer[i,j] = ti.Vector([0, 0, 0])
-        '''screen_buffer[i,j,0]=0
-        screen_buffer[i,j,1]=0
-        screen_buffer[i,j,2]=0'''
+    pass
+    '''for i, j in ti.ndrange(SCREENWIDTH,SCREENHEIGHT):
+    screen_buffer[i,j] = ti.Vector([0, 0, 0])'''
+    '''screen_buffer[i,j,0]=0
+    screen_buffer[i,j,1]=0
+    screen_buffer[i,j,2]=0'''
 
 @ti.kernel
 def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
@@ -116,8 +117,6 @@ def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
 
 
 
-
-
     #for i, j in ti.ndrange(SCREENWIDTH,SCREENHEIGHT):
     for p in range(Number_of_points):
         #if 0<screen_points[p,0] and screen_points[p,0]<SCREENWIDTH and 0<screen_points[p,1] and screen_points[p,1]<SCREENHEIGHT:
@@ -127,104 +126,41 @@ def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
         screen_buffer[i,j,1]=255
 
 
-
 '''
 for x in range(visible_count[None]):
     print(f'{screen_points[x,0]},{screen_points[x,1]}')
 '''
 
 # pynput 控制部分
-from pynput import mouse, keyboard
+from pynput import keyboard
 import threading
-import pyautogui
-import ctypes
 import sys
-
-# 鼠标状态
-mouse_dx = 0
-mouse_dy = 0
-mouse_scroll = 0
-mouse_pressed = False
-mouse_lock_state = True  # True: 锁定并隐藏, False: 解锁并显示
-mouse_lock = threading.Lock()
 
 # 键盘状态
 keys_pressed = set()
 key_lock = threading.Lock()
 
-# Windows 隐藏鼠标的API
-if sys.platform == 'win32':
-    user32 = ctypes.windll.user32
-    def hide_cursor():
-        user32.ShowCursor(False)
-    def show_cursor():
-        user32.ShowCursor(True)
-else:
-    def hide_cursor():
-        pass
-    def show_cursor():
-        pass
-
-def set_mouse_lock(locked):
-    """设置鼠标锁定状态"""
-    global mouse_lock_state
-    mouse_lock_state = locked
-
-    if locked:
-        # 锁定：隐藏鼠标并移到中心
-        hide_cursor()
-        pyautogui.moveTo(SCREENWIDTH / 2, SCREENHEIGHT / 2)
-        # 可选：限制鼠标移动范围（Windows）
-        if sys.platform == 'win32':
-            ctypes.windll.user32.ClipCursor(ctypes.byref(
-                ctypes.wintypes.RECT(0, 0, SCREENWIDTH, SCREENHEIGHT)
-            ))
-    else:
-        # 解锁：显示鼠标并解除限制
-        show_cursor()
-        if sys.platform == 'win32':
-            ctypes.windll.user32.ClipCursor(None)
-
-def on_move(x, y):
-    global mouse_dx, mouse_dy
-    if mouse_lock_state:  # 只在锁定时处理鼠标移动
-        with mouse_lock:
-            mouse_dx += x - SCREENWIDTH / 2
-            mouse_dy += y - SCREENHEIGHT / 2
-
-        # 重置鼠标到屏幕中心
-        pyautogui.moveTo(SCREENWIDTH / 2, SCREENHEIGHT / 2)
-
-def on_click(x, y, button, pressed):
-    global mouse_pressed
-    if button == mouse.Button.left and mouse_lock_state:
-        mouse_pressed = pressed
-
-def on_scroll(x, y, dx, dy):
-    global mouse_scroll
-    with mouse_lock:
-        mouse_scroll += dy
-
 def on_press(key):
-    global mouse_lock_state
-
     with key_lock:
         try:
-            # 处理 ESC 键切换锁定状态
-            if key == keyboard.Key.esc:
-                set_mouse_lock(not mouse_lock_state)
-            else:
-                if hasattr(key, 'char') and key.char:
-                    keys_pressed.add(key.char)
+            if hasattr(key, 'char') and key.char:
+                keys_pressed.add(key.char)
         except AttributeError:
-            if key == keyboard.Key.esc:
-                set_mouse_lock(not mouse_lock_state)
-            elif key == keyboard.Key.space:
+            if key == keyboard.Key.space:
                 keys_pressed.add('space')
             elif key == keyboard.Key.shift:
                 keys_pressed.add('shift')
             elif key == keyboard.Key.ctrl:
                 keys_pressed.add('ctrl')
+            # 方向键和数字键
+            elif key == keyboard.Key.up:
+                keys_pressed.add('up')
+            elif key == keyboard.Key.down:
+                keys_pressed.add('down')
+            elif key == keyboard.Key.left:
+                keys_pressed.add('left')
+            elif key == keyboard.Key.right:
+                keys_pressed.add('right')
 
 def on_release(key):
     with key_lock:
@@ -238,24 +174,27 @@ def on_release(key):
                 keys_pressed.discard('shift')
             elif key == keyboard.Key.ctrl:
                 keys_pressed.discard('ctrl')
+            # 方向键和数字键
+            elif key == keyboard.Key.up:
+                keys_pressed.discard('up')
+            elif key == keyboard.Key.down:
+                keys_pressed.discard('down')
+            elif key == keyboard.Key.left:
+                keys_pressed.discard('left')
+            elif key == keyboard.Key.right:
+                keys_pressed.discard('right')
 
 # 启动监听器
-mouse_listener = mouse.Listener(on_move=on_move, on_click=on_click, on_scroll=on_scroll)
-mouse_listener.start()
-
 keyboard_listener = keyboard.Listener(on_press=on_press, on_release=on_release)
 keyboard_listener.start()
 
 # 创建GUI窗口
-gui = ti.GUI("Renderer", res=(SCREENWIDTH, SCREENHEIGHT))
+gui = ti.ui.Window("Renderer", (SCREENWIDTH, SCREENHEIGHT))
+canvas = gui.get_canvas()
 
 # 速度参数
 move_speed = 0.5
-rotate_speed = 0.01
-scroll_rotate_speed = 2
-
-# 初始化：锁定并隐藏鼠标
-set_mouse_lock(True)
+rotate_speed = 0.5
 
 # 主循环
 while gui.running:
@@ -267,28 +206,7 @@ while gui.running:
     y_rotate = 0.0
     z_rotate = 0.0
 
-    # 只在锁定时处理鼠标输入
-    if mouse_lock_state:
-        with mouse_lock:
-            dx = mouse_dx
-            dy = mouse_dy
-            mouse_dx = 0
-            mouse_dy = 0
-
-            scroll = mouse_scroll
-            mouse_scroll = 0
-
-        # 鼠标左键控制旋转
-        if mouse_pressed:
-            # 根据实际效果调整符号
-            x_rotate = -dy * rotate_speed    # 上下控制俯仰
-            z_rotate = dx * rotate_speed    # 左右控制偏航
-
-        # 滚轮控制Z轴旋转
-        if scroll != 0:
-            y_rotate = scroll * scroll_rotate_speed
-
-    # 处理键盘平移（锁定和解锁时都可以移动）
+    # 处理键盘输入
     with key_lock:
         current_keys = keys_pressed.copy()
 
@@ -306,6 +224,22 @@ while gui.running:
     if 'e' in current_keys:
         camera_y = move_speed
 
+    # 方向键控制视角旋转（俯仰和偏航）
+    if 'j' in current_keys:
+        x_rotate = -rotate_speed
+    if 'u' in current_keys:
+        x_rotate = rotate_speed
+    if 'h' in current_keys:
+        z_rotate = -rotate_speed
+    if 'k' in current_keys:
+        z_rotate = rotate_speed
+
+    # 数字键 0 和 9 控制滚转
+    if '0' in current_keys:
+        y_rotate = -rotate_speed
+    if '9' in current_keys:
+        y_rotate = rotate_speed
+
     world_to_cam(
         camera_x=camera_x,
         camera_y=camera_y,
@@ -316,14 +250,9 @@ while gui.running:
         focal_lenth=focal_lenth
     )
 
-    gui.set_image(screen_buffer)
+    canvas.set_image(screen_buffer)
     gui.show()
 
-# 退出时解锁鼠标
-set_mouse_lock(False)
-
 # 停止监听器
-mouse_listener.stop()
 keyboard_listener.stop()
-
 
