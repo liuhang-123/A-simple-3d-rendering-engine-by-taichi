@@ -22,8 +22,8 @@ NEAR_SUFACE=10
 
 ti.init(arch=ti.gpu)
 
-Number_of_triangles=100
-MAX_Number_of_triangles=100
+Number_of_triangles=1000
+MAX_Number_of_triangles=1000
 
 
 #原数据
@@ -40,7 +40,7 @@ compacted_triangles=ti.field(dtype=ti.f32, shape=(MAX_Number_of_triangles,3,2))
 
 
 #屏幕像素
-screen_buffer=ti.field(dtype=ti.f32, shape=(SCREENWIDTH, SCREENHEIGHT, 3))
+screen_buffer=ti.field(dtype=ti.u8, shape=(SCREENWIDTH, SCREENHEIGHT, 3))
 
 #三角形包围盒
 triangle_box=ti.field(dtype=ti.i32, shape=(MAX_Number_of_triangles,4))
@@ -100,7 +100,7 @@ def clear():
 @ti.kernel
 def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
                  x_rotate: ti.f32, y_rotate: ti.f32, z_rotate: ti.f32,focal_lenth:ti.f32):
-    screen_buffer.fill(0)
+    screen_buffer.fill(ti.cast(0,ti.u8))
     x_rotate_=x_rotate*PI/180
     y_rotate_=y_rotate*PI/180
     z_rotate_=z_rotate*PI/180
@@ -155,7 +155,7 @@ def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
             ti.i32)
         '''
         # 剔除逻辑暂时省略
-        if triangles[i,d, 2] >= NEAR_SUFACE:#and 
+        if triangles[i,d, 2] >= NEAR_SUFACE:#and
             #if ti.abs(focal_lenth * triangles[i,d, 0]  / triangles[i,d, 2]) < SCREENWIDTH / 2 and ti.abs(focal_lenth * triangles[i,d, 1] / triangles[i,d, 2]) < SCREENHEIGHT / 2:
             #if True:
             screen_triangles[i,d, 0] =ti.cast( focal_lenth * triangles[i,d, 0] / triangles[i,d, 2] + SCREENWIDTH / 2,ti.i32)
@@ -183,8 +183,8 @@ def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
     #render triangles
     #计算包围盒并排序，整理保存
     tri_box_index[0]=0
-    for i in range(Number_of_triangles):
-        
+    for i in ti.ndrange(Number_of_triangles):
+
         x1 = screen_triangles[i, 0, 0]
         y1 = screen_triangles[i, 0, 1]
         x2 = screen_triangles[i, 1, 0]
@@ -215,7 +215,7 @@ def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
             #triangle_box[]
 
     for x,y,i in ti.ndrange(tiles_x,tiles_y,tri_box_index[0]):
-        
+
 
 
         min_x=triangle_box[i,0]
@@ -229,29 +229,41 @@ def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
         tile_min_y=TILE_SIZE*y
 
         if min_x < tile_max_x and max_x > tile_min_x and min_y < tile_max_y and max_y > tile_min_y:
-            for px,py in ti.ndrange(TILE_SIZE,TILE_SIZE):
-                ix=px+tile_min_x
-                iy=py+tile_min_y
 
-                x1 = compacted_triangles[i, 0, 0]
-                y1 = compacted_triangles[i, 0, 1]
-                x2 = compacted_triangles[i, 1, 0]
-                y2 = compacted_triangles[i, 1, 1]
-                x3 = compacted_triangles[i, 2, 0]
-                y3 = compacted_triangles[i, 2, 1]
+            x1 = compacted_triangles[i, 0, 0]
+            y1 = compacted_triangles[i, 0, 1]
+            x2 = compacted_triangles[i, 1, 0]
+            y2 = compacted_triangles[i, 1, 1]
+            x3 = compacted_triangles[i, 2, 0]
+            y3 = compacted_triangles[i, 2, 1]
+
+            inner_min_x = ti.cast(ti.max(tile_min_x, ti.min(ti.min(x1, x2), x3)),ti.i32)
+            inner_max_x = ti.cast(ti.min(tile_max_x -1, ti.max(ti.max(x1, x2), x3)),ti.i32)
+            inner_min_y = ti.cast(ti.max(tile_min_y, ti.min(ti.min(y1, y2), y3)),ti.i32)
+            inner_max_y = ti.cast(ti.min(tile_max_y-1, ti.max(ti.max(y1, y2), y3)),ti.i32)
+            x_size=inner_max_x-inner_min_x+1#ti.cast(inner_max_x-inner_min_x,ti.i32)
+            y_size=inner_max_y-inner_min_y+1#ti.cast(inner_max_y-inner_min_y,ti.i32)
 
 
-                d1 = (x1 - ix) * (y2 - iy) - (x2 - ix) * (y1 - iy)
-                d2 = (x2 - ix) * (y3 - iy) - (x3 - ix) * (y2 - iy)
-                d3 = (x3 - ix) * (y1 - iy) - (x1 - ix) * (y3 - iy)
+            for px,py in ti.ndrange(x_size,y_size):
 
-                has_pos = d1 > 0 or d2 > 0 or d3 > 0
-                has_neg = d1 < 0 or d2 < 0 or d3 < 0
 
-                if not (has_pos and has_neg):
-                    screen_buffer[ix, iy, 0] = 0.5
-                    #screen_buffer[x, y, 1] = 255.0
-                    screen_buffer[ix,iy , 2] = 0.5
+
+                ix=px+inner_min_x
+                iy=py+inner_min_y
+
+                if screen_buffer[ix,iy,0]==0:
+                    d1 = (x1 - ix) * (y2 - iy) - (x2 - ix) * (y1 - iy)
+                    d2 = (x2 - ix) * (y3 - iy) - (x3 - ix) * (y2 - iy)
+                    d3 = (x3 - ix) * (y1 - iy) - (x1 - ix) * (y3 - iy)
+
+                    has_pos = d1 > 0 or d2 > 0 or d3 > 0
+                    has_neg = d1 < 0 or d2 < 0 or d3 < 0
+
+                    if not (has_pos and has_neg):
+                        screen_buffer[ix, iy, 0] = 200
+
+                        screen_buffer[ix,iy , 2] = 200
 
 
 
@@ -397,4 +409,3 @@ while gui.running:
 
 # 停止监听器
 keyboard_listener.stop()
-
