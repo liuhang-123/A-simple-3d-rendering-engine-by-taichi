@@ -1,6 +1,8 @@
 import taichi as ti
 import math
 import sys
+import read_obj
+import os
 SCREENWIDTH=1500
 SCREENHEIGHT=1500
 PI = math.pi
@@ -14,14 +16,15 @@ focal_lenth=500
 
 ti.init(arch=ti.gpu)
 
-Number_of_points=1000000
-MAX_Number_of_points=1000000
+
+Number_of_points=20000000
+MAX_Number_of_points=20000000
 dots=ti.field(dtype=ti.f32, shape=(MAX_Number_of_points,3))
 points=ti.field(dtype=ti.f32, shape=(MAX_Number_of_points,3))
 #filtered_points=ti.field(dtype=ti.f32, shape=(MAX_Number_of_points,3))
 screen_points=ti.field(dtype=ti.i32, shape=(MAX_Number_of_points,2))
 #faces=ti.field(dtype=ti.f32, shape=(MAX_Number_of_dot//2,3))
-visible_count = ti.field(dtype=ti.i32, shape=())
+#visible_count = ti.field(dtype=ti.i32, shape=())
 bool_f=ti.field(dtype=ti.i8,shape=(MAX_Number_of_points))
 
 screen_buffer=ti.field(dtype=ti.f32, shape=(SCREENWIDTH, SCREENHEIGHT, 3))
@@ -36,7 +39,19 @@ def generate_dot():
         points[i, 0] = ti.random() * 100.0
         points[i, 1] = ti.random() * 100.0
         points[i, 2] = ti.random() * 100.0
-generate_dot()
+#generate_dot()
+
+
+
+
+try:
+    points_,index,count=read_obj.load_obj_vertices("../resources/stanford-bunny.obj",Number_of_points,20)
+    print(f'模型点数:{count},正在插值')
+    points,count=read_obj.fill_face(points_,index,0.0015)
+    print(f'最终点数:{count}')
+except:
+    generate_dot()
+
 
 @ti.func
 def rotate(x,y,theta):
@@ -121,8 +136,10 @@ def world_to_cam(camera_x: ti.f32, camera_y: ti.f32, camera_z: ti.f32,
         #if 0<screen_points[p,0] and screen_points[p,0]<SCREENWIDTH and 0<screen_points[p,1] and screen_points[p,1]<SCREENHEIGHT:
         i=screen_points[p,0]
         j=screen_points[p,1]
-        screen_buffer[i,j,0]=255
-        screen_buffer[i,j,1]=255
+        depth_color=ti.select(1/points[p,2]>screen_buffer[i,j,0],1/points[p,2],screen_buffer[i,j,0])
+        screen_buffer[i,j,0]=depth_color
+        screen_buffer[i,j,1]=depth_color
+        screen_buffer[i,j,2]=depth_color
 
 
 '''
@@ -192,7 +209,7 @@ gui = ti.ui.Window("Renderer", (SCREENWIDTH, SCREENHEIGHT))
 canvas = gui.get_canvas()
 
 # 速度参数
-move_speed = 0.5
+move_speed = 0.05
 rotate_speed = 0.5
 
 # 主循环
@@ -250,6 +267,7 @@ while gui.running:
     )
 
     canvas.set_image(screen_buffer)
+
     gui.show()
 
 # 停止监听器
